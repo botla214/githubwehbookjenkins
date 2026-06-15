@@ -1,0 +1,17 @@
+# RelayProxy routing table
+# Rules are evaluated top-to-bottom; first match wins.
+# Use "*" as a wildcard for repo or branch.
+
+routes:
+  - repo: my-python-app
+    branch: main
+    jenkins_job: python-ci
+
+  - repo: my-python-app
+    branch: develop
+    jenkins_job: python-ci
+
+  # Catch-all: any other repo/branch not matched above
+  - repo: "*"
+    branch: "*"
+    jenkins_job: python-ci

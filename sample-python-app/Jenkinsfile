@@ -1,0 +1,39 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo "Repo: ${env.GIT_URL ?: 'local'} | Branch: ${env.GIT_BRANCH ?: 'unknown'}"
+                checkout scm
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh 'pip3 install -r requirements.txt'
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                sh 'python3 -m pytest tests/ -v'
+            }
+        }
+
+        stage('Run App') {
+            steps {
+                sh 'python3 main.py'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Build PASSED — triggered by RelayProxy from GitLab push"
+        }
+        failure {
+            echo "Build FAILED — check test output above"
+        }
+    }
+}

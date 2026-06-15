@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+
+  gitlab:
+    image: gitlab/gitlab-ce:16.11.0-ce.0
+    container_name: gitlab
+    restart: unless-stopped
+    hostname: gitlab
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://localhost:8929'
+        gitlab_rails['initial_root_password'] = 'Admin1234!'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+        gitlab_rails['outbound_local_requests_allowlist'] = ['relay-proxy', '172.0.0.0/8']
+        nginx['listen_port'] = 80
+    ports:
+      - "8929:80"
+      - "8443:443"
+      - "2222:22"
+    volumes:
+      - gitlab_config:/etc/gitlab
+      - gitlab_logs:/var/log/gitlab
+      - gitlab_data:/var/opt/gitlab
+    networks:
+      - ci-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/-/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 15
+      start_period: 300s
+
+  relay-proxy:
+    build:
+      context: ./relay-proxy
+      dockerfile: Dockerfile
+    container_name: relay-proxy
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GITLAB_WEBHOOK_SECRET=webhook-secret-123
+      - JENKINS_URL=http://jenkins:8080
+      - JENKINS_USER=admin
+      - JENKINS_PASSWORD=admin123
+    depends_on:
+      - jenkins
+    networks:
+      - ci-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  jenkins:
+    build:
+      context: ./jenkins
+      dockerfile: Dockerfile
+    container_name: jenkins
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+      - CASC_JENKINS_CONFIG=/usr/share/jenkins/ref/casc.yaml
+    networks:
+      - ci-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+volumes:
+  gitlab_config:
+  gitlab_logs:
+  gitlab_data:
+  jenkins_home:
+
+networks:
+  ci-network:
+    driver: bridge

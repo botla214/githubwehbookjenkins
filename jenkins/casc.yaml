@@ -1,0 +1,49 @@
+jenkins:
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "admin123"
+
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+  numExecutors: 2
+
+unclassified:
+  location:
+    url: "http://localhost:8080/"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              scope: GLOBAL
+              id: "gitlab-creds"
+              username: "root"
+              password: "Admin1234!"
+              description: "GitLab root credentials for repo checkout"
+
+# Auto-create the python-ci pipeline job using Job DSL
+jobs:
+  - script: |
+      pipelineJob('python-ci') {
+        description('Python CI Pipeline — triggered via RelayProxy from GitLab')
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('http://gitlab/root/my-python-app.git')
+                  credentials('gitlab-creds')
+                }
+                branches('*/main', '*/develop')
+              }
+            }
+            scriptPath('Jenkinsfile')
+          }
+        }
+      }
