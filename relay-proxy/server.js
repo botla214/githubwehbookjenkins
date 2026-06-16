@@ -25,17 +25,28 @@ function findRoute(repoName, branch) {
   });
 }
 
-// Call Jenkins REST API with CSRF crumb (required when CSRF protection is on)
+// Call Jenkins REST API with CSRF crumb + session cookie
 async function triggerJenkins(jobName) {
   const auth = { username: JENKINS_USER, password: JENKINS_PASSWORD };
 
+  // Fetch crumb and capture the session cookie from the same response
   const crumbRes = await axios.get(`${JENKINS_URL}/crumbIssuer/api/json`, { auth });
   const { crumbRequestField, crumb } = crumbRes.data;
+
+  // Jenkins binds the crumb to the session — must send the same session cookie
+  const rawCookies = crumbRes.headers['set-cookie'] || [];
+  const cookieHeader = rawCookies.map(c => c.split(';')[0]).join('; ');
 
   await axios.post(
     `${JENKINS_URL}/job/${encodeURIComponent(jobName)}/build`,
     null,
-    { auth, headers: { [crumbRequestField]: crumb } }
+    {
+      auth,
+      headers: {
+        [crumbRequestField]: crumb,
+        ...(cookieHeader && { Cookie: cookieHeader }),
+      },
+    }
   );
 }
 
